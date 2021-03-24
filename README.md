@@ -1,3 +1,9 @@
+# WIP:
+this was forked from Nestak2's image-sorter2 project.
+
+My goal in this fork is design a system for labeling corners of sudoku puzzle images.
+
+
 # image-sorter2
 One-click image sorting/labelling script. Copies or moves images from a folder into subfolders.
 
