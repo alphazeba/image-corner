@@ -27,7 +27,8 @@
 # the folder in which the pictures that are to be sorted are stored
 # don't forget to end it with the sign '/' !
 #input_folder = '/file_path/to/image_folder/'
-input_folder = 'C:\\Users\\arnHom\\Documents\\sudoku\\data\\aug\\'
+main_path =  'C:\\Users\\arnho\\Documents\\sudoku\\'
+input_folder = main_path + 'aug\\'
 
 # the different folders into which you want to sort the images, e.g. ['cars', 'bikes', 'cats', 'horses', 'shoes']
 labels = ["label1"]
@@ -43,7 +44,7 @@ copy_or_move = 'copy'
 # If you provide a path to file that already exists, than this file will be used for keeping track of the storing.
 # This means: 1st time you run this script and such a file doesn't exist the file will be created and populated,
 # 2nd time you run the same script, and you use the same df_path, the script will use the file to continue the sorting.
-df_path = 'C:/Users/arnHom/Documents/sudoku/data/labels.txt'
+df_path = main_path + 'data\\labels.csv'
 
 # a selection of what file-types to be sorted, anything else will be excluded
 file_extensions = ['.jpg', '.png', '.whatever','.jpeg']
@@ -111,9 +112,8 @@ class ImageGui:
         self.image_raw = None
         self.image = None
         self.image_panel = tk.Label(frame)
-
-        # set image container to first image
-        self.set_image(paths[self.index])
+        self.cachedImage = None
+        self.cachedImagePath = ""
 
         # Make buttons
         self.buttons = []
@@ -164,6 +164,9 @@ class ImageGui:
         # Place the image in grid
         self.image_panel.grid(row=2, column=0, columnspan=self.n_labels+1, sticky='we')
 
+        # bind click listener to the image panel
+        self.image_panel.bind('<Button-1>',self.image_click)
+
         # key bindings (so number pad can be used as shortcut)
         # make it not work for 'copy', so there is no conflict between typing a picture to go to and choosing a label with a number-key
         if copy_or_move == 'move':
@@ -178,6 +181,33 @@ class ImageGui:
     
     def save(self):
         df.to_csv(df_path)
+
+    def image_click(self,event):
+        image = self.image_raw
+        halfSize = np.array(image.size)/2
+        x,y= event.x,event.y
+        quadrant = -1
+        if y < halfSize[1]:
+            if x < halfSize[0]:
+                quadrant = 0
+            else:
+                quadrant = 1
+        else: # x>= 
+            if x < halfSize[0]:
+                quadrant = 2
+            else:
+                quadrant = 3
+        x = (x%halfSize[0])/halfSize[0]
+        y = (y%halfSize[1])/halfSize[1]
+
+        self.corners[:,quadrant] = [x,y]
+        self.set_image(self.cachedImagePath,corners=self.corners)
+        self.write_metadata(self.index,self.corners)
+        self.corners_label.configure(text=str(self.corners))
+
+        print(event.x)
+
+        print(event)
                 
     def read_metadata(self,index):
         # formats the data as as a 2x4 array 
@@ -185,18 +215,12 @@ class ImageGui:
         #   topleft, topright, botleft,botright
         # x    n        n         n       n
         # y    n        n         n       n
-        data = df.iloc[index].to_numpy()
-        print(data)
-        data = data[1:]
-        print(data)
-        data = data.reshape((2,4),order='F')
-        print(data)
+        data = df.iloc[index].to_numpy()[1:].reshape((2,4),order='F')
         return data
     
     def write_metadata(self,index,data):
         reshaped = data.reshape((1,8),order='F').squeeze()
         current = df.iloc[index].to_numpy()
-        print(current)
         current[1:] = reshaped
         df.iloc[index] = current
 
@@ -217,7 +241,60 @@ class ImageGui:
         self.corners = self.read_metadata(self.index)
         
         self.corners_label.configure(text=str(self.corners))
-        print(self.corners)
+        self.set_image(df.iloc[self.index].im_path,corners=self.corners)
+
+    def set_image(self, path, guide=True,corners=np.zeros((2,4))):
+        """
+        Helper function which sets a new image in the image view
+        :param path: path to that image
+        """
+        image = None
+        if(path == self.cachedImagePath):
+            print('recovered image from cache')
+            image = self.cachedImage.copy()
+        else:
+            print('loaded image from disk')
+            image = self._load_image(path)
+            self.cachedImagePath = path
+            self.cachedImage = image.copy()
+        print(image.size)   
+
+        # paint on the guid
+        if guide:
+            size = image.size
+            halfSize = np.array(size)/2
+            vx = int(size[0]/2)
+            hy = int(size[1]/2)
+            pxls = image.load()
+            width = 5
+            halfWidth = int(width/2)
+
+            for x in range(size[0]):
+                for i in range(width):
+                    y = hy + i-halfWidth
+                    pxls[x,y] = self._invertPixel(pxls[x,y])
+
+            for y in range(size[1]):
+                for i in range(width):
+                    x = vx + i-halfWidth
+                    pxls[x,y] = self._invertPixel(pxls[x,y])
+            
+            # highlight the corners.
+            multipliers = np.array([[0,0],[1,0],[0,1],[1,1]])
+            for i in range(4):
+                multiplier = multipliers[i,:].squeeze()
+                corner = corners[:,i].squeeze()
+                drawSpot = corner*halfSize+multiplier*halfSize
+                for ix in range(width):
+                    for iy in range(width):
+                        x = ix+drawSpot[0]-halfWidth
+                        y = iy+drawSpot[1]-halfWidth
+                        pxls[x,y] = self._invertPixel(pxls[x,y])
+            
+
+        self.image_raw = image
+        self.image = ImageTk.PhotoImage(image)
+        self.image_panel.configure(image=self.image)
 
     # for moving the next image ( happens when you click a sort button. )
     def show_next_image(self):
@@ -244,16 +321,6 @@ class ImageGui:
         doesn't update the progress display
         """
         self.open_image(self.index+1)
-
-    def set_image(self, path):
-        """
-        Helper function which sets a new image in the image view
-        :param path: path to that image
-        """
-        image = self._load_image(path)
-        self.image_raw = image
-        self.image = ImageTk.PhotoImage(image)
-        self.image_panel.configure(image=self.image)
 
     def vote(self, label):
         """
@@ -304,6 +371,12 @@ class ImageGui:
         # -1 in line below, because we want images bo be counted from 1 on, not from 0
         self.index = self.return_.get() - 1
         self.open_image(self.index)
+
+    @staticmethod
+    def _invertPixel(pxl):
+        r,g,b = pxl
+        pxl = (255-r,int((255-g)/2),int((255-b)/2))
+        return pxl
 
     @staticmethod
     def _load_image(path):
