@@ -26,10 +26,11 @@
 
 # the folder in which the pictures that are to be sorted are stored
 # don't forget to end it with the sign '/' !
-input_folder = '/file_path/to/image_folder/'
+#input_folder = '/file_path/to/image_folder/'
+input_folder = 'C:\\Users\\arnHom\\Documents\\sudoku\\data\\aug\\'
 
 # the different folders into which you want to sort the images, e.g. ['cars', 'bikes', 'cats', 'horses', 'shoes']
-labels = ["label1", "label2", "label3"]
+labels = ["label1"]
 
 # provide either 'copy' or 'move', depending how you want to sort the images into the new folders
 # - 'move' starts where you left off last time sorting, no 'go to #pic', works with number-buttons for labeling, no txt-file for tracking after closing GUI, saves memory
@@ -42,10 +43,10 @@ copy_or_move = 'copy'
 # If you provide a path to file that already exists, than this file will be used for keeping track of the storing.
 # This means: 1st time you run this script and such a file doesn't exist the file will be created and populated,
 # 2nd time you run the same script, and you use the same df_path, the script will use the file to continue the sorting.
-df_path = '/file_path/to/non_existing_file_df.txt'
+df_path = 'C:/Users/arnHom/Documents/sudoku/data/labels.txt'
 
 # a selection of what file-types to be sorted, anything else will be excluded
-file_extensions = ['.jpg', '.png', '.whatever']
+file_extensions = ['.jpg', '.png', '.whatever','.jpeg']
 
 # set resize to True to resize image keeping same aspect ratio
 # set resize to False to display original image
@@ -99,6 +100,8 @@ class ImageGui:
         #### added in version 2
         self.sorting_label = 'unsorted'
         ####
+        
+        self.corners = np.zeros((2,4))
 
         # Number of labels and paths
         self.n_labels = len(labels)
@@ -122,6 +125,7 @@ class ImageGui:
         ### added in version 2
         self.buttons.append(tk.Button(frame, text="prev im", width=10, height=1, fg="green", command=lambda l=label: self.move_prev_image()))
         self.buttons.append(tk.Button(frame, text="next im", width=10, height=1, fg='green', command=lambda l=label: self.move_next_image()))
+        self.buttons.append(tk.Button(frame, text="save quit", width = 10, height=1, fg='red', command=lambda l=label: self.save_exit_button()))
         ###
         
         # Add progress label
@@ -134,13 +138,15 @@ class ImageGui:
             #frame.grid_columnconfigure(ll, weight=1)
 
         # Place progress label in grid
-        self.progress_label.grid(row=0, column=self.n_labels+2, sticky='we') # +2, since progress_label is placed after
+        self.progress_label.grid(row=1, column=self.n_labels+2, sticky='we') # +2, since progress_label is placed after
                                                                             # and the additional 2 buttons "next im", "prev im"
             
         #### added in version 2
         # Add sorting label
-        sorting_string = os.path.split(df.sorted_in_folder[self.index])[-2]
+        sorting_string = "poop"# os.path.split(df.sorted_in_folder[self.index])[-2] # this will not work.
         self.sorting_label = tk.Label(frame, text=("in folder: %s" % (sorting_string)), width=15)
+        # add the corners display text
+        self.corners_label = tk.Label(frame, text=str(self.corners))
         
         # Place typing input in grid, in case the mode is 'copy'
         if copy_or_move == 'copy':
@@ -153,7 +159,7 @@ class ImageGui:
         ####
         
         # Place sorting label in grid
-        self.sorting_label.grid(row=2, column=self.n_labels+1, sticky='we') # +2, since progress_label is placed after
+        self.corners_label.grid(row=2, column=self.n_labels+1, sticky='we') # +2, since progress_label is placed after
                                                                             # and the additional 2 buttons "next im", "prev im"
         # Place the image in grid
         self.image_panel.grid(row=2, column=0, columnspan=self.n_labels+1, sticky='we')
@@ -163,59 +169,81 @@ class ImageGui:
         if copy_or_move == 'move':
             for key in range(self.n_labels):
                 master.bind(str(key+1), self.vote_key)
+        self.open_image(0)
+    
+    def save_exit_button(self):
+        self.save()
+        # self.master.quit() # i'm not certain that this is really working.
+        
+    
+    def save(self):
+        df.to_csv(df_path)
+                
+    def read_metadata(self,index):
+        # formats the data as as a 2x4 array 
+        #
+        #   topleft, topright, botleft,botright
+        # x    n        n         n       n
+        # y    n        n         n       n
+        data = df.iloc[index].to_numpy()
+        print(data)
+        data = data[1:]
+        print(data)
+        data = data.reshape((2,4),order='F')
+        print(data)
+        return data
+    
+    def write_metadata(self,index,data):
+        reshaped = data.reshape((1,8),order='F').squeeze()
+        current = df.iloc[index].to_numpy()
+        print(current)
+        current[1:] = reshaped
+        df.iloc[index] = current
 
-    def show_next_image(self):
-        """
-        Displays the next image in the paths list and updates the progress display
-        """
-        self.index += 1
+    def open_image(self,index):
+        self.index = index
         progress_string = "%d/%d" % (self.index+1, self.n_paths)
         self.progress_label.configure(text=progress_string)
         
         #### added in version 2
-        sorting_string = os.path.split(df.sorted_in_folder[self.index])[-2] #shows the last folder in the filepath before the file
-        self.sorting_label.configure(text=("in folder: %s" % (sorting_string)))
+        # i'm not sure what this is for.
+        sorting_string = "poop"# os.path.split(df.sorted_in_folder[self.index])[-2] #shows the last folder in the filepath before the file
+        test = "in folder: %s" % (sorting_string)
+        self.sorting_label.configure(text=("what"))
         ####
 
-        if self.index < self.n_paths:
-            self.set_image(df.sorted_in_folder[self.index])
-        else:
-            self.master.quit()
+        # we should also load in the meta data for this particular item, if it exists.
+        # TODO figure out how the data is being read and written.
+        self.corners = self.read_metadata(self.index)
+        
+        self.corners_label.configure(text=str(self.corners))
+        print(self.corners)
+
+    # for moving the next image ( happens when you click a sort button. )
+    def show_next_image(self):
+        """
+        Displays the next image in the paths list and updates the progress display
+        """
+        self.move_next_image()
     
-    ### added in version 2        
+    ### for moving to the previous image (attached to a button)       
     def move_prev_image(self):
         """
         Displays the prev image in the paths list AFTER BUTTON CLICK,
         doesn't update the progress display
         """
-        self.index -= 1
-        progress_string = "%d/%d" % (self.index+1, self.n_paths)
-        self.progress_label.configure(text=progress_string)
-        
-        sorting_string = os.path.split(df.sorted_in_folder[self.index])[-2] #shows the last folder in the filepath before the file
-        self.sorting_label.configure(text=("in folder: %s" % (sorting_string)))
-        
-        if self.index < self.n_paths:
-            self.set_image(df.sorted_in_folder[self.index]) # change path to be out of df
+        if self.index > 0:
+            self.open_image(self.index-1)
         else:
-            self.master.quit()
+            print("already at 0 can't move back any further")
     
-    ### added in version 2
+    # for moving to the next image (attached to a button)
     def move_next_image(self):
         """
         Displays the next image in the paths list AFTER BUTTON CLICK,
         doesn't update the progress display
         """
-        self.index += 1
-        progress_string = "%d/%d" % (self.index+1, self.n_paths)
-        self.progress_label.configure(text=progress_string)
-        sorting_string = os.path.split(df.sorted_in_folder[self.index])[-2] #shows the last folder in the filepath before the file
-        self.sorting_label.configure(text=("in folder: %s" % (sorting_string)))
-        
-        if self.index < self.n_paths:
-            self.set_image(df.sorted_in_folder[self.index])
-        else:
-            self.master.quit()
+        self.open_image(self.index+1)
 
     def set_image(self, path):
         """
@@ -232,6 +260,7 @@ class ImageGui:
         Processes a vote for a label: Initiates the file copying and shows the next image
         :param label: The label that the user voted for
         """
+        """
         ##### added in version 2
         # check if image has already been sorted (sorted_in_folder != 0)
         if df.sorted_in_folder[self.index] != df.im_path[self.index]:
@@ -244,13 +273,19 @@ class ImageGui:
             input_path = df.im_path[self.index]
             root, file_name = os.path.split(input_path)
         #####
+        """
+        self.write_metadata(self.index,self.corners)
         
+        # what is root and file_name used for? it doesn't really look like it gets use?????
+        
+        # we don't actually want to be moving anything anymore.
+        """
         #input_path = self.paths[self.index]
         if copy_or_move == 'copy':
             self._copy_image(label, self.index)
         if copy_or_move == 'move':
             self._move_image(label, self.index)
-            
+        """
         self.show_next_image()
 
     def vote_key(self, event):
@@ -268,13 +303,7 @@ class ImageGui:
         Works only in mode 'copy'."""
         # -1 in line below, because we want images bo be counted from 1 on, not from 0
         self.index = self.return_.get() - 1
-        
-        progress_string = "%d/%d" % (self.index+1, self.n_paths)
-        self.progress_label.configure(text=progress_string)
-        sorting_string = os.path.split(df.sorted_in_folder[self.index])[-2] #shows the last folder in the filepath before the file
-        self.sorting_label.configure(text=("in folder: %s" % (sorting_string)))
-        
-        self.set_image(df.sorted_in_folder[self.index])
+        self.open_image(self.index)
 
     @staticmethod
     def _load_image(path):
@@ -382,6 +411,17 @@ if __name__ == "__main__":
     paths = [input_folder+file_name for file_name in file_names]
     
     
+    try:
+        df = pd.read_csv(df_path,header=0,index_col=0)
+    except FileNotFoundError:
+        df = pd.DataFrame(columns=["im_path", 'tlx','tly','trx','try','blx','bly','brx','bry'])
+        defaultValues = np.ones((len(paths),1))*0.5;
+        df.im_path = paths
+        for name in df.columns:
+            if name != 'im_path':
+                df[name] = defaultValues
+        
+    """
     if copy_or_move == 'copy':
         try:
             df = pd.read_csv(df_path, header=0)
@@ -394,6 +434,7 @@ if __name__ == "__main__":
         df = pd.DataFrame(columns=["im_path", 'sorted_in_folder'])
         df.im_path = paths
         df.sorted_in_folder = paths
+    """
     #######
     
 # Start the GUI
