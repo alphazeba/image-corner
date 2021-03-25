@@ -10,7 +10,8 @@ Purpose driven for identifying the corners of a square inside the image.
 <img width="700" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/image%20corner?raw=true">
 
 
-https://play.google.com/store/apps/details?id=co.slidebox
+# how to use
+clicking on the image will immediately update the feature in that quadrant.  press "next image" or the d key to move to the next image.  Press "prev image" or the a key to move to the previous image.  Click "save" to write the current metadata to disk.
 
 ### Authors:
 original Author: Christian Baumgartner (c.baumgartner@imperial.ac.uk),
