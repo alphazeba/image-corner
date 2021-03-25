@@ -62,6 +62,7 @@ class ImageGui:
         # gui stuff.
         # So we can quit the window from within the functions
         self.master = master
+        master.title("image-corner")
         frame = tk.Frame(master)
         frame.grid()
 
@@ -81,10 +82,10 @@ class ImageGui:
 
         # Make buttons
         self.buttons = []
-        self.buttons.append(tk.Button(frame, text="prev im", width=10, height=1, fg="green", command=lambda : self.move_prev_image()))
-        self.buttons.append(tk.Button(frame, text="next im", width=10, height=1, fg='green', command=lambda : self.move_next_image()))
-        self.buttons.append(tk.Button(frame, text="save", width = 10, height=1, fg='red', command=lambda : self.save_exit_button()))
-        self.buttons.append(tk.Button(frame, text="preview warp", width = 10, height=1, fg='blue', command=lambda : self.handle_warp_toggle()))
+        self.buttons.append(tk.Button(frame, text="prev (a)", width=10, height=1, fg="green", command=lambda : self.move_prev_image()))
+        self.buttons.append(tk.Button(frame, text="next (d)", width=10, height=1, fg='green', command=lambda : self.move_next_image()))
+        self.buttons.append(tk.Button(frame, text="(s)ave", width = 10, height=1, fg='red', command=lambda : self.save_exit_button()))
+        self.buttons.append(tk.Button(frame, text="preview (w)arp", width = 10, height=1, fg='blue', command=lambda : self.handle_warp_toggle()))
         # Place buttons in grid
         for ll, button in enumerate(self.buttons):
             button.grid(row=0, column=ll, sticky='we')
@@ -94,7 +95,7 @@ class ImageGui:
         progress_string = "%d/%d" % (self.index+1, self.n_paths)
         self.progress_label = tk.Label(frame, text=progress_string, width=10)
         # Place progress label in grid
-        self.progress_label.grid(row=1, column=2, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
+        self.progress_label.grid(row=1, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
         
         # go to box.
         tk.Label(frame, text="go to #pic:").grid(row=1, column=0)
@@ -105,18 +106,26 @@ class ImageGui:
         master.bind('<Return>', self.num_pic_type)
         
         # add the corners display text
-        self.corners_label = tk.Label(frame, text=str(self.corners))
+        self.corners_label = tk.Label(frame,anchor='w')
         # Place corners label in grid
-        self.corners_label.grid(row=2, column=1, sticky='we') 
+        self.corners_label.grid(row=3, column=0, sticky='we') 
         
         # Place the image in grid
-        self.image_panel.grid(row=2, column=0, columnspan=1, sticky='we')
+        self.image_panel.grid(row=2, column=0, columnspan=4, sticky='we')
 
         # bind click listener to the image panel
         self.image_panel.bind('<Button-1>',self.image_click)
         master.bind('<KeyRelease>', self.key_pressed)
         # finish  setup by opening the first image.
         self.open_image(0)
+        self.set_corner_label()
+        
+    def set_corner_label(self):
+        text = ''
+        labels = ['top left','top right','bot left','bot right']
+        for i in range(4):
+            text += labels[i] + '(' + str(self.corners[0,i])+','+ str(self.corners[1,i])+')\n'
+        self.corners_label.configure(text=text)
     
     def save_exit_button(self):
         self.save()
@@ -137,6 +146,8 @@ class ImageGui:
             self.move_next_image()
         elif event.char == 'w':
             self.handle_warp_toggle()
+        elif event.char == 's':
+            self.save_exit_button()
         
     def image_click(self,event):
         if self.warpMode:
@@ -162,7 +173,7 @@ class ImageGui:
         self.corners[:,quadrant] = [x,y]
         self.set_image(self.cachedImagePath,corners=self.corners)
         self.write_metadata(self.index,self.corners)
-        self.corners_label.configure(text=str(self.corners))
+        self.set_corner_label()
 
         print(event.x)
 
@@ -193,7 +204,7 @@ class ImageGui:
         # TODO figure out how the data is being read and written.
         self.corners = self.read_metadata(self.index)
         
-        self.corners_label.configure(text=str(self.corners))
+        self.set_corner_label()
         self.set_image(df.iloc[self.index].im_path,corners=self.corners)
 
     def set_image(self, path, guide=True,corners=np.zeros((2,4))):

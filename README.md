@@ -7,7 +7,7 @@ My goal in this fork is design a system for labeling corners of sudoku puzzle im
 allows simple click to place location features in the 4 quadrants of an image.  
 Purpose driven for identifying the corners of a square inside the image.
 
-<img width="700" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/image%20corner?raw=true">
+<img width="700" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/demoImage.png?raw=true">
 
 
 # how to use
