@@ -115,6 +115,8 @@ class ImageGui:
         self.cachedImage = None
         self.cachedImagePath = ""
 
+        self.warpMode = False
+
         # Make buttons
         self.buttons = []
             
@@ -122,6 +124,8 @@ class ImageGui:
         self.buttons.append(tk.Button(frame, text="prev im", width=10, height=1, fg="green", command=lambda l=label: self.move_prev_image()))
         self.buttons.append(tk.Button(frame, text="next im", width=10, height=1, fg='green', command=lambda l=label: self.move_next_image()))
         self.buttons.append(tk.Button(frame, text="save", width = 10, height=1, fg='red', command=lambda l=label: self.save_exit_button()))
+        
+        self.buttons.append(tk.Button(frame, text="preview warp", width = 10, height=1, fg='blue', command=lambda l=label: self.handle_warp_toggle()))
         ###
         
         # Add progress label
@@ -162,7 +166,7 @@ class ImageGui:
 
         # bind click listener to the image panel
         self.image_panel.bind('<Button-1>',self.image_click)
-        master.bind('<Key>', self.key_pressed)
+        master.bind('<KeyRelease>', self.key_pressed)
 
         self.open_image(0)
     
@@ -170,6 +174,10 @@ class ImageGui:
         self.save()
         # self.master.quit() # i'm not certain that this is really working.
         
+    def handle_warp_toggle(self):
+        print(self.warpMode)
+        self.warpMode = not self.warpMode
+        self.set_image(self.cachedImagePath,guide=not self.warpMode,corners=self.corners)
     
     def save(self):
         df.to_csv(df_path)
@@ -179,9 +187,14 @@ class ImageGui:
             self.move_prev_image()
         elif event.char == 'd':
             self.move_next_image()
+        elif event.char == 'w':
+            self.handle_warp_toggle()
         
 
     def image_click(self,event):
+        if self.warpMode:
+            print('ignoring click while in warpmode')
+            return
         image = self.image_raw
         halfSize = np.array(image.size)/2
         x,y= event.x,event.y
@@ -224,6 +237,7 @@ class ImageGui:
         df.iloc[index] = current
 
     def open_image(self,index):
+        self.warpMode = False
         self.index = index
         progress_string = "%d/%d" % (self.index+1, self.n_paths)
         self.progress_label.configure(text=progress_string)
@@ -289,7 +303,9 @@ class ImageGui:
                         x = ix+drawSpot[0]-halfWidth
                         y = iy+drawSpot[1]-halfWidth
                         pxls[x,y] = self._invertPixel(pxls[x,y])
-            
+        else:
+            # lets show off the warped version!
+            image = self.perspectiveWarp(image,corners)
 
         self.image_raw = image
         self.image = ImageTk.PhotoImage(image)
@@ -370,6 +386,35 @@ class ImageGui:
         # -1 in line below, because we want images bo be counted from 1 on, not from 0
         self.index = self.return_.get() - 1
         self.open_image(self.index)
+
+    def getCornersInWorldSpace(self,corners):
+        width = 5
+        halfWidth = int(width/2)
+        # highlight the corners.
+        multipliers = np.array([[0,0],[1,0],[0,1],[1,1]]).transpose()
+        return (corners+multipliers)/2
+
+    @staticmethod
+    def tween(avec,bvec, amt):
+        dif = bvec-avec
+        return avec+dif*amt
+
+    def perspectiveWarp(self,image,corners):
+        size = image.size
+        srcPxls = image.copy().load()
+        pxls = image.load()
+        realCorners = self.getCornersInWorldSpace(corners) * np.array(size).reshape((2,1))
+        for y in range(size[1]):
+            fy = y/size[1]
+            left = self.tween(realCorners[:,0],realCorners[:,2],fy)
+            right = self.tween(realCorners[:,1],realCorners[:,3],fy)
+            for x in range(size[0]):
+                fx = x/size[0]
+                rmpos = self.tween(left,right,fx).squeeze()
+                ix = max(min(int(rmpos[0]),size[0]),0)
+                iy = max(min(int(rmpos[1]),size[1]),0)
+                pxls[x,y] = srcPxls[ix,iy]
+        return image
 
     @staticmethod
     def _invertPixel(pxl):
