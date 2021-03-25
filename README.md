@@ -7,11 +7,14 @@ My goal in this fork is design a system for labeling corners of sudoku puzzle im
 allows simple click to place location features in the 4 quadrants of an image.  
 Purpose driven for identifying the corners of a square inside the image.
 
-<img width="700" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/demoImage.png?raw=true">
+<img width="500" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/demoImage.png?raw=true">
 
 
 # how to use
 clicking on the image will immediately update the feature in that quadrant.  press "next image" or the d key to move to the next image.  Press "prev image" or the a key to move to the previous image.  Click "save" to write the current metadata to disk.
+enter warpmode to preview the selected area
+
+<img width="500" alt="pic_github_readme" src="https://github.com/alphazeba/image-corner/blob/master/warpDemo.png?raw=true">
 
 ### Authors:
 original Author: Christian Baumgartner (c.baumgartner@imperial.ac.uk),
