@@ -117,15 +117,11 @@ class ImageGui:
 
         # Make buttons
         self.buttons = []
-        for label in labels:
-            self.buttons.append(
-                    tk.Button(frame, text=label, width=10, height=2, fg='blue', command=lambda l=label: self.vote(l))
-            )
             
         ### added in version 2
         self.buttons.append(tk.Button(frame, text="prev im", width=10, height=1, fg="green", command=lambda l=label: self.move_prev_image()))
         self.buttons.append(tk.Button(frame, text="next im", width=10, height=1, fg='green', command=lambda l=label: self.move_next_image()))
-        self.buttons.append(tk.Button(frame, text="save quit", width = 10, height=1, fg='red', command=lambda l=label: self.save_exit_button()))
+        self.buttons.append(tk.Button(frame, text="save", width = 10, height=1, fg='red', command=lambda l=label: self.save_exit_button()))
         ###
         
         # Add progress label
@@ -166,12 +162,8 @@ class ImageGui:
 
         # bind click listener to the image panel
         self.image_panel.bind('<Button-1>',self.image_click)
+        master.bind('<Key>', self.key_pressed)
 
-        # key bindings (so number pad can be used as shortcut)
-        # make it not work for 'copy', so there is no conflict between typing a picture to go to and choosing a label with a number-key
-        if copy_or_move == 'move':
-            for key in range(self.n_labels):
-                master.bind(str(key+1), self.vote_key)
         self.open_image(0)
     
     def save_exit_button(self):
@@ -181,6 +173,13 @@ class ImageGui:
     
     def save(self):
         df.to_csv(df_path)
+
+    def key_pressed(self,event):
+        if event.char == 'a':
+            self.move_prev_image()
+        elif event.char == 'd':
+            self.move_next_image()
+        
 
     def image_click(self,event):
         image = self.image_raw
