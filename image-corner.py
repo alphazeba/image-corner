@@ -25,7 +25,7 @@ input_folder = 'aug'
 # If you provide a path to file that already exists, than this file will be used for keeping track of the storing.
 # This means: 1st time you run this script and such a file doesn't exist the file will be created and populated,
 # 2nd time you run the same script, and you use the same df_path, the script will use the file to continue the sorting.
-df_path = 'labels.csv'
+df_path = 'labels2.csv'
 
 # a selection of what file-types to be sorted, anything else will be excluded
 file_extensions = ['.jpg', '.png', '.whatever','.jpeg']
@@ -69,7 +69,6 @@ class ImageGui:
         # Start at the first file name
         self.index = 0
         self.paths = paths
-        self.n_paths= len(self.paths)
 
         # initialize current image data.
         self.image_raw = None
@@ -82,17 +81,18 @@ class ImageGui:
 
         # Make buttons
         self.buttons = []
-        self.buttons.append(tk.Button(frame, text="prev (a)", width=10, height=1, fg="green", command=lambda : self.move_prev_image()))
-        self.buttons.append(tk.Button(frame, text="next (d)", width=10, height=1, fg='green', command=lambda : self.move_next_image()))
-        self.buttons.append(tk.Button(frame, text="(s)ave", width = 10, height=1, fg='red', command=lambda : self.save_exit_button()))
+        self.buttons.append(tk.Button(frame, text="prev (a)", width=10, height=1, fg="black", command=lambda : self.move_prev_image()))
+        self.buttons.append(tk.Button(frame, text="next (d)", width=10, height=1, fg='black', command=lambda : self.move_next_image()))
+        self.buttons.append(tk.Button(frame, text="(s)ave", width = 10, height=1, fg='green', command=lambda : self.save_exit_button()))
         self.buttons.append(tk.Button(frame, text="preview (w)arp", width = 10, height=1, fg='blue', command=lambda : self.handle_warp_toggle()))
+        self.buttons.append(tk.Button(frame, text="(r)emove img", width=10,height=1,fg ='red',command=lambda: self.remove_image()))
         # Place buttons in grid
         for ll, button in enumerate(self.buttons):
             button.grid(row=0, column=ll, sticky='we')
             #frame.grid_columnconfigure(ll, weight=1)
 
         # Add progress label
-        progress_string = "%d/%d" % (self.index+1, self.n_paths)
+        progress_string = "%d/%d" % (self.index+1, len(df))
         self.progress_label = tk.Label(frame, text=progress_string, width=10)
         # Place progress label in grid
         self.progress_label.grid(row=1, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
@@ -108,10 +108,10 @@ class ImageGui:
         # add the corners display text
         self.corners_label = tk.Label(frame,anchor='w')
         # Place corners label in grid
-        self.corners_label.grid(row=3, column=0, sticky='we') 
+        self.corners_label.grid(row=3, column=0,columnspan=3, sticky='we') 
         
         # Place the image in grid
-        self.image_panel.grid(row=2, column=0, columnspan=4, sticky='we')
+        self.image_panel.grid(row=2, column=0, columnspan=5, sticky='we')
 
         # bind click listener to the image panel
         self.image_panel.bind('<Button-1>',self.image_click)
@@ -137,8 +137,11 @@ class ImageGui:
         self.set_image(self.cachedImagePath,guide=not self.warpMode,corners=self.corners)
     
     def save(self):
+        path = os.path.join(main_path,df_path)
         df.to_csv(os.path.join(main_path,df_path))
+        print('saved file at ',path)
 
+    # handles the hotkeys.
     def key_pressed(self,event):
         if event.char == 'a':
             self.move_prev_image()
@@ -148,6 +151,8 @@ class ImageGui:
             self.handle_warp_toggle()
         elif event.char == 's':
             self.save_exit_button()
+        elif event.char == 'r':
+            self.remove_image()
         
     def image_click(self,event):
         if self.warpMode:
@@ -197,7 +202,7 @@ class ImageGui:
     def open_image(self,index):
         self.warpMode = False
         self.index = index
-        progress_string = "%d/%d" % (self.index+1, self.n_paths)
+        progress_string = "%d/%d" % (self.index+1, len(df))
         self.progress_label.configure(text=progress_string)
         
         # we should also load in the meta data for this particular item, if it exists.
@@ -288,6 +293,11 @@ class ImageGui:
         self.index = self.return_.get() - 1
         self.open_image(self.index)
 
+    def remove_image(self):
+        df.drop(index=self.index,inplace=True)
+        df.reset_index(drop=True,inplace=True)
+        self.open_image(self.index)
+        
     def getCornersInWorldSpace(self,corners):
         width = 5
         halfWidth = int(width/2)
