@@ -41,6 +41,7 @@ import numpy as np
 
 import argparse
 import tkinter as tk
+from tkinter import filedialog
 import os
 from shutil import copyfile, move
 from PIL import ImageTk, Image
@@ -120,12 +121,37 @@ class ImageGui:
         self.open_image(0)
         self.set_corner_label()
         
+    def add_image_to_data(self):
+        global df
+        filenames = filedialog.askopenfilenames( initialdir = main_path, title='select files', filetypes = ( ('jpg files', ['*.jpg','*.jpeg']), ('all files','*.*')) )
+        toAppend = []
+        for f in filenames:
+            # copy the file over to main_path + input_folder 
+            
+            # prepare the names 
+            basename = os.path.basename(f)
+            newRelativeName = os.path.join(input_folder,basename)
+            print(newRelativeName)
+            # copy the file over.
+            copyfile(f, os.path.join(main_path,newRelativeName))
+            
+            # add a new row to the df
+            newData = [newRelativeName, 0.5,0.5, 0.5,0.5, 0.5,0.5, 0.5,0.5]            
+            series = pd.Series(newData, index = df.columns)
+            df = df.append(series, ignore_index=True)
+        print(len(df))
+        self.set_progress_label()
+        
     def set_corner_label(self):
         text = ''
         labels = ['top left','top right','bot left','bot right']
         for i in range(4):
             text += labels[i] + '(' + str(self.corners[0,i])+','+ str(self.corners[1,i])+')\n'
         self.corners_label.configure(text=text)
+    
+    def set_progress_label(self):
+        progress_string = "%d/%d" % (self.index+1, len(df))
+        self.progress_label.configure(text=progress_string)
     
     def save_exit_button(self):
         self.save()
@@ -153,6 +179,8 @@ class ImageGui:
             self.save_exit_button()
         elif event.char == 'r':
             self.remove_image()
+        elif event.char == 'o':
+            self.add_image_to_data()
         
     def image_click(self,event):
         if self.warpMode:
@@ -202,8 +230,7 @@ class ImageGui:
     def open_image(self,index):
         self.warpMode = False
         self.index = index
-        progress_string = "%d/%d" % (self.index+1, len(df))
-        self.progress_label.configure(text=progress_string)
+        self.set_progress_label()
         
         # we should also load in the meta data for this particular item, if it exists.
         # TODO figure out how the data is being read and written.
