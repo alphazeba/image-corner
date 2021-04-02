@@ -11,35 +11,17 @@ designed for identifying corners in an image.
  changes, version 2: Nestor Arsenov (nestorarsenov_AT_gmail_DOT_com)
  image-corner: alphazeba
 """
-
-
-# Define global variables, which are to be changed by user:
-
-# the folder in which the pictures that are to be sorted are stored
-# don't forget to end it with the sign '/' !
-#input_folder = '/file_path/to/image_folder/'
-main_path =  'C:\\Users\\arnHom\\Documents\\sudoku\\data'
-input_folder = 'aug'
-# A file-path to a txt-file, that WILL be created by the script. The results of the sorting wil be stored there.
-# Don't provide a filepath to an empty file, provide to a non-existing one!
-# If you provide a path to file that already exists, than this file will be used for keeping track of the storing.
-# This means: 1st time you run this script and such a file doesn't exist the file will be created and populated,
-# 2nd time you run the same script, and you use the same df_path, the script will use the file to continue the sorting.
-df_path = 'labels2.csv'
-
 # a selection of what file-types to be sorted, anything else will be excluded
 file_extensions = ['.jpg', '.png', '.whatever','.jpeg']
 
 # set resize to True to resize image keeping same aspect ratio
 # set resize to False to display original image
 resize = True
-
 #####
 import pandas as pd
 import os
 import numpy as np
-
-import argparse
+import argparse # do we need this?
 import tkinter as tk
 from tkinter import filedialog
 import os
@@ -92,27 +74,32 @@ class ImageGui:
             button.grid(row=0, column=ll, sticky='we')
             #frame.grid_columnconfigure(ll, weight=1)
 
+        # adding a second row of buttons 
+        lastButton = tk.Button(frame, text='imp(o)rt data', width = 10, height=1, fg = 'blue', command = lambda: self.add_image_to_data())
+        lastButton.grid( row=1, column = 0, sticky = 'we')
+        self.buttons.append(lastButton)
+
         # Add progress label
         progress_string = "%d/%d" % (self.index+1, len(df))
         self.progress_label = tk.Label(frame, text=progress_string, width=10)
         # Place progress label in grid
-        self.progress_label.grid(row=1, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
+        self.progress_label.grid(row=2, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
         
         # go to box.
-        tk.Label(frame, text="go to #pic:").grid(row=1, column=0)
+        tk.Label(frame, text="go to #pic:").grid(row=2, column=0)
         # listen for typing in the "go to" box.
         self.return_ = tk.IntVar() # return_-> self.index
         self.return_entry = tk.Entry(frame, width=6, textvariable=self.return_)
-        self.return_entry.grid(row=1, column=1, sticky='we')
+        self.return_entry.grid(row=2, column=1, sticky='we')
         master.bind('<Return>', self.num_pic_type)
         
         # add the corners display text
         self.corners_label = tk.Label(frame,anchor='w')
         # Place corners label in grid
-        self.corners_label.grid(row=3, column=0,columnspan=3, sticky='we') 
+        self.corners_label.grid(row=4, column=0,columnspan=3, sticky='we') 
         
         # Place the image in grid
-        self.image_panel.grid(row=2, column=0, columnspan=5, sticky='we')
+        self.image_panel.grid(row=3, column=0, columnspan=5, sticky='we')
 
         # bind click listener to the image panel
         self.image_panel.bind('<Button-1>',self.image_click)
@@ -124,19 +111,16 @@ class ImageGui:
     def add_image_to_data(self):
         global df
         filenames = filedialog.askopenfilenames( initialdir = main_path, title='select files', filetypes = ( ('jpg files', ['*.jpg','*.jpeg']), ('all files','*.*')) )
-        toAppend = []
         for f in filenames:
             # copy the file over to main_path + input_folder 
-            
             # prepare the names 
             basename = os.path.basename(f)
-            newRelativeName = os.path.join(input_folder,basename)
+            newRelativeName = basename
             print(newRelativeName)
             # copy the file over.
             copyfile(f, os.path.join(main_path,newRelativeName))
-            
             # add a new row to the df
-            newData = [newRelativeName, 0.5,0.5, 0.5,0.5, 0.5,0.5, 0.5,0.5]            
+            newData = [newRelativeName, 0.5,0.5, 0.5,0.5, 0.5,0.5, 0.5,0.5]
             series = pd.Series(newData, index = df.columns)
             df = df.append(series, ignore_index=True)
         print(len(df))
@@ -385,6 +369,39 @@ def make_folder(directory):
         os.makedirs(directory)
         
 
+main_path =  'C:\\Users\\arnHom\\Documents\\sudoku\\data'
+df_path = 'labels.csv'
+
+def setMainPath():
+    global main_path, df_path
+    path = filedialog.askopenfilenames(title='Open project', filetypes = ( ('csv files', ['*.csv']), ('all files','*.*')) )
+    # now we need to break the basename off of the rest of the directory
+    path, basename = os.path.split(path)
+    df_path = basename
+    main_path = path
+
+def newProject():
+    global main_path, df_path
+    path = filedialog.askdirectory(title='Set folder for new project (the one with your images in it)')
+    main_path = path
+    df_path = 'labels.csv'
+    
+    # Put all image file paths into a list
+    paths = []
+    
+    file_names = [fn for fn in sorted(os.listdir( main_path))
+                  if any(fn.endswith(ext) for ext in file_extensions)]
+    paths = [file_name for file_name in file_names]
+
+    print('created a new data file')
+    df = pd.DataFrame(columns=["im_path", 'tlx','tly','trx','try','blx','bly','brx','bry'])
+    defaultValues = np.ones((len(paths),1))*0.5
+    df.im_path = paths
+    for name in df.columns:
+        if name != 'im_path':
+            df[name] = defaultValues
+
+
 # The main bit of the script only gets exectured if it is directly called
 if __name__ == "__main__":
 
@@ -399,29 +416,27 @@ if __name__ == "__main__":
 #     # grab input arguments from args structure
 #     input_folder = args.folder
 #     labels = args.labels
+
+
+    # Start the GUI
+    root = tk.Tk()
+
+
+    testFrame = tk.Frame(root)
+    testFrame.grid()
+
+    openButton = tk.Button(testFrame, text='open project', command=lambda: setMainPath())
+    openButton.grid(row=0,column=0,columnspan=3,sticky='we')
+
+    newButton = tk.Button(testFrame, text='new project', command = lambda: newProject())
+    newButton.grid(row=1, column=0, columnspan=3, sticky='we')
+
+    # once we get the main stuff all setup, we need to boot the imagegui going agin
+
+    root.mainloop()
+    # is there a way to allow files to show? 
+
     
-    # Put all image file paths into a list
-    paths = []
-    
-    file_names = [fn for fn in sorted(os.listdir( os.path.join(main_path,input_folder )))
-                  if any(fn.endswith(ext) for ext in file_extensions)]
-    paths = [os.path.join(input_folder,file_name) for file_name in file_names]
-    
-    try:
-        test = os.path.join(main_path, df_path)
-        print(test)
-        df = pd.read_csv(os.path.join(main_path, df_path),header=0,index_col=0)
-    except FileNotFoundError: # if it doesn't exist generate a blank one.    
-        print('created a new data file');
-        df = pd.DataFrame(columns=["im_path", 'tlx','tly','trx','try','blx','bly','brx','bry'])
-        defaultValues = np.ones((len(paths),1))*0.5;
-        df.im_path = paths
-        for name in df.columns:
-            if name != 'im_path':
-                df[name] = defaultValues
-    
-# Start the GUI
-root = tk.Tk()
-app = ImageGui(root, paths)
-root.mainloop()
+
+    # app = ImageGui(root, paths)
 
