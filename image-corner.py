@@ -33,8 +33,153 @@ class ImageGui:
     GUI for iFind1 image sorting. This draws the GUI and handles all the events.
     Useful, for sorting views into sub views or for removing outliers from the data.
     """
+    
+    def buildMainView(self):
+        self.deleteCurrentFrame()
+        
+        self.frame = tk.Frame(self.master)
+        self.frame.grid()
+        # Start at the first file name
+        self.index = 0
+        
+        # initialize current image data.
+        self.image_raw = None
+        self.image = None
+        self.image_panel = tk.Label(self.frame)
+        self.cachedImage = None
+        self.cachedImagePath = ""
+        self.warpMode = False
+        self.corners = np.zeros((2,4))
 
-    def __init__(self, master, paths):
+        # Make buttons
+        self.buttons = []
+        
+        menu = tk.Menu(self.master)
+        
+        fileMenu = tk.Menu(menu)
+        editMenu = tk.Menu(menu)
+        viewMenu = tk.Menu(menu)
+        
+        menu.add_cascade(label='file', menu=fileMenu)
+        menu.add_cascade(label='edit', menu=editMenu)
+        menu.add_cascade(label='view', menu=viewMenu)
+        
+        fileMenu.add_command(label='(s)ave',command=self.save_exit_button)
+        fileMenu.add_separator()
+        fileMenu.add_command(label='open project', command=self.openProject)
+        fileMenu.add_command(label='new project', command=self.newProject)
+        fileMenu.add_separator()
+        fileMenu.add_command(label='close project', command = self.closeProject)
+        
+        editMenu.add_command(label='(r)emove image',command=self.remove_image)
+        editMenu.add_separator()
+        editMenu.add_command(label='imp(o)rt images',command=self.add_image_to_data)
+        
+        viewMenu.add_command(label='preview (w)arp', command=self.handle_warp_toggle)
+        
+        self.master.configure(menu=menu)
+        
+        self.buttons.append(tk.Button(self.frame, text="prev (a)", width=10, height=1, fg="black", command=lambda : self.move_prev_image()))
+        self.buttons.append(tk.Button(self.frame, text="next (d)", width=10, height=1, fg='black', command=lambda : self.move_next_image()))
+        # Place buttons in grid
+        for ll, button in enumerate(self.buttons):
+            button.grid(row=1, column=ll, sticky='we')
+
+        # Add progress label
+        progress_string = "%d/%d" % (self.index+1, len(self.df))
+        self.progress_label = tk.Label(self.frame, text=progress_string, width=10)
+        # Place progress label in grid
+        self.progress_label.grid(row=2, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
+        
+        # go to box.
+        tk.Label(self.frame, text="go to #pic:").grid(row=2, column=0)
+        # listen for typing in the "go to" box.
+        self.return_ = tk.IntVar() # return_-> self.index
+        self.return_entry = tk.Entry(self.frame, width=6, textvariable=self.return_)
+        self.return_entry.grid(row=2, column=1, sticky='we')
+        self.master.bind('<Return>', self.num_pic_type)
+        
+        # add the corners display text
+        self.corners_label = tk.Label(self.frame,anchor='w')
+        # Place corners label in grid
+        self.corners_label.grid(row=4, column=0,columnspan=3, sticky='we') 
+        
+        # Place the image in grid
+        self.image_panel.grid(row=3, column=0, columnspan=5, sticky='we')
+
+        # bind click listener to the image panel
+        self.image_panel.bind('<Button-1>',self.image_click)
+        self.master.bind('<KeyRelease>', self.key_pressed)
+        # finish  setup by opening the first image.
+        self.open_image(0)
+        self.set_corner_label()
+        
+    def buildIntroView(self):
+        self.deleteCurrentFrame()
+        
+        self.frame = tk.Frame(root)
+        self.frame.grid()
+        
+        emptyMenu = tk.Menu(self.master)
+        self.master.configure(menu=emptyMenu)
+
+        openButton = tk.Button(self.frame, text='open project', command=self.openProject)
+        openButton.grid(row=0,column=0,sticky='we')
+
+        newButton = tk.Button(self.frame, text='new project', command = self.newProject)
+        newButton.grid(row=0, column=1, sticky='we')
+        
+    def openProject(self):
+        path = filedialog.askopenfilename(title='Open project', filetypes = ( ('csv files', ['*.csv']), ('all files','*.*')) )
+        if path == '':
+            print("didn't open a project")
+            return
+        # what is returned if someone exits?
+        print('the path: "',path,'"')
+        # now we need to break the basename off of the rest of the directory
+        path, basename = os.path.split(path)
+        self.df_path = basename
+        self.main_path = path
+        self.df = pd.read_csv( os.path.join(self.main_path, self.df_path) , header =0, index_col=0)
+        
+        self.buildMainView()
+
+    def newProject(self):
+        path = filedialog.askdirectory(title='Set folder for new project (the one with your images in it)')
+        if path == '':
+            print("didn't create a project")
+            return
+        print('the path: "',path,'"')
+        self.main_path = path
+        self.df_path = 'labels.csv'
+        
+        # Put all image file paths into a list
+        paths = []
+        
+        file_names = [fn for fn in sorted(os.listdir( self.main_path))
+                      if any(fn.endswith(ext) for ext in file_extensions)]
+        paths = [file_name for file_name in file_names]
+
+        print('created a new data file')
+        self.df = pd.DataFrame(columns=["im_path", 'tlx','tly','trx','try','blx','bly','brx','bry'])
+        defaultValues = np.ones((len(paths),1))*0.5
+        self.df.im_path = paths
+        for name in self.df.columns:
+            if name != 'im_path':
+                self.df[name] = defaultValues
+                
+        self.buildMainView()
+        
+    def closeProject(self):
+        self.df = None
+        self.buildIntroView()
+
+    def deleteCurrentFrame(self):
+        if self.frame != None:
+            self.frame.destroy()
+            self.frame = None
+
+    def __init__(self, master):
         """
         Initialise GUI
         :param master: The parent window
@@ -46,71 +191,15 @@ class ImageGui:
         # So we can quit the window from within the functions
         self.master = master
         master.title("image-corner")
-        frame = tk.Frame(master)
-        frame.grid()
-
-        # Start at the first file name
-        self.index = 0
-        self.paths = paths
-
-        # initialize current image data.
-        self.image_raw = None
-        self.image = None
-        self.image_panel = tk.Label(frame)
-        self.cachedImage = None
-        self.cachedImagePath = ""
-        self.warpMode = False
-        self.corners = np.zeros((2,4))
-
-        # Make buttons
-        self.buttons = []
-        self.buttons.append(tk.Button(frame, text="prev (a)", width=10, height=1, fg="black", command=lambda : self.move_prev_image()))
-        self.buttons.append(tk.Button(frame, text="next (d)", width=10, height=1, fg='black', command=lambda : self.move_next_image()))
-        self.buttons.append(tk.Button(frame, text="(s)ave", width = 10, height=1, fg='green', command=lambda : self.save_exit_button()))
-        self.buttons.append(tk.Button(frame, text="preview (w)arp", width = 10, height=1, fg='blue', command=lambda : self.handle_warp_toggle()))
-        self.buttons.append(tk.Button(frame, text="(r)emove img", width=10,height=1,fg ='red',command=lambda: self.remove_image()))
-        # Place buttons in grid
-        for ll, button in enumerate(self.buttons):
-            button.grid(row=0, column=ll, sticky='we')
-            #frame.grid_columnconfigure(ll, weight=1)
-
-        # adding a second row of buttons 
-        lastButton = tk.Button(frame, text='imp(o)rt data', width = 10, height=1, fg = 'blue', command = lambda: self.add_image_to_data())
-        lastButton.grid( row=1, column = 0, sticky = 'we')
-        self.buttons.append(lastButton)
-
-        # Add progress label
-        progress_string = "%d/%d" % (self.index+1, len(df))
-        self.progress_label = tk.Label(frame, text=progress_string, width=10)
-        # Place progress label in grid
-        self.progress_label.grid(row=2, column=3, sticky='we') # +2, since progress_label is placed after and the additional 2 buttons "next im", "prev im"
-        
-        # go to box.
-        tk.Label(frame, text="go to #pic:").grid(row=2, column=0)
-        # listen for typing in the "go to" box.
-        self.return_ = tk.IntVar() # return_-> self.index
-        self.return_entry = tk.Entry(frame, width=6, textvariable=self.return_)
-        self.return_entry.grid(row=2, column=1, sticky='we')
-        master.bind('<Return>', self.num_pic_type)
-        
-        # add the corners display text
-        self.corners_label = tk.Label(frame,anchor='w')
-        # Place corners label in grid
-        self.corners_label.grid(row=4, column=0,columnspan=3, sticky='we') 
-        
-        # Place the image in grid
-        self.image_panel.grid(row=3, column=0, columnspan=5, sticky='we')
-
-        # bind click listener to the image panel
-        self.image_panel.bind('<Button-1>',self.image_click)
-        master.bind('<KeyRelease>', self.key_pressed)
-        # finish  setup by opening the first image.
-        self.open_image(0)
-        self.set_corner_label()
+        self.frame = None
+        self.main_path =  'C:\\Users\\arnHom\\Documents\\sudoku\\data'
+        self.df_path = 'labels.csv'
+        # move to the first view.
+        self.buildIntroView()
+        self.df = None
         
     def add_image_to_data(self):
-        global df
-        filenames = filedialog.askopenfilenames( initialdir = main_path, title='select files', filetypes = ( ('jpg files', ['*.jpg','*.jpeg']), ('all files','*.*')) )
+        filenames = filedialog.askopenfilenames( initialdir = self.main_path, title='select files', filetypes = ( ('jpg files', ['*.jpg','*.jpeg']), ('all files','*.*')) )
         for f in filenames:
             # copy the file over to main_path + input_folder 
             # prepare the names 
@@ -118,12 +207,12 @@ class ImageGui:
             newRelativeName = basename
             print(newRelativeName)
             # copy the file over.
-            copyfile(f, os.path.join(main_path,newRelativeName))
-            # add a new row to the df
+            copyfile(f, os.path.join(self.main_path,newRelativeName))
+            # add a new row to the self.df
             newData = [newRelativeName, 0.5,0.5, 0.5,0.5, 0.5,0.5, 0.5,0.5]
-            series = pd.Series(newData, index = df.columns)
-            df = df.append(series, ignore_index=True)
-        print(len(df))
+            series = pd.Series(newData, index = self.df.columns)
+            self.df = self.df.append(series, ignore_index=True)
+        print(len(self.df))
         self.set_progress_label()
         
     def set_corner_label(self):
@@ -134,7 +223,7 @@ class ImageGui:
         self.corners_label.configure(text=text)
     
     def set_progress_label(self):
-        progress_string = "%d/%d" % (self.index+1, len(df))
+        progress_string = "%d/%d" % (self.index+1, len(self.df))
         self.progress_label.configure(text=progress_string)
     
     def save_exit_button(self):
@@ -147,8 +236,8 @@ class ImageGui:
         self.set_image(self.cachedImagePath,guide=not self.warpMode,corners=self.corners)
     
     def save(self):
-        path = os.path.join(main_path,df_path)
-        df.to_csv(os.path.join(main_path,df_path))
+        path = os.path.join(self.main_path,self.df_path)
+        self.df.to_csv(path)
         print('saved file at ',path)
 
     # handles the hotkeys.
@@ -202,14 +291,14 @@ class ImageGui:
         #   topleft, topright, botleft,botright
         # x    n        n         n       n
         # y    n        n         n       n
-        data = df.iloc[index].to_numpy()[1:].reshape((2,4),order='F')
+        data = self.df.iloc[index].to_numpy()[1:].reshape((2,4),order='F')
         return data
     
     def write_metadata(self,index,data):
         reshaped = data.reshape((1,8),order='F').squeeze()
-        current = df.iloc[index].to_numpy()
+        current = self.df.iloc[index].to_numpy()
         current[1:] = reshaped
-        df.iloc[index] = current
+        self.df.iloc[index] = current
 
     def open_image(self,index):
         self.warpMode = False
@@ -221,7 +310,7 @@ class ImageGui:
         self.corners = self.read_metadata(self.index)
         
         self.set_corner_label()
-        self.set_image(df.iloc[self.index].im_path,corners=self.corners)
+        self.set_image(self.df.iloc[self.index].im_path,corners=self.corners)
 
     def set_image(self, path, guide=True,corners=np.zeros((2,4))):
         """
@@ -301,12 +390,13 @@ class ImageGui:
         """Function that allows for typing to what picture the user wants to go.
         Works only in mode 'copy'."""
         # -1 in line below, because we want images bo be counted from 1 on, not from 0
+        self.master.focus() # this steals focus from the intvar widget, so the use doesn't accidentally keep typing in it.
         self.index = self.return_.get() - 1
         self.open_image(self.index)
 
     def remove_image(self):
-        df.drop(index=self.index,inplace=True)
-        df.reset_index(drop=True,inplace=True)
+        self.df.drop(index=self.index,inplace=True)
+        self.df.reset_index(drop=True,inplace=True)
         self.open_image(self.index)
         
     def getCornersInWorldSpace(self,corners):
@@ -344,14 +434,13 @@ class ImageGui:
         pxl = (255-r,int((255-g)/2),int((255-b)/2))
         return pxl
 
-    @staticmethod
-    def _load_image(path):
+    def _load_image(self, path):
         """
         Loads and resizes an image from a given path using the Pillow library
         :param path: Path to image
         :return: Resized or original image 
         """
-        image = Image.open(os.path.join( main_path,path))
+        image = Image.open(os.path.join(self.main_path,path))
         if(resize):
             max_height = 500
             img = image 
@@ -360,83 +449,15 @@ class ImageGui:
             image = img.resize((int(s[0]*ratio), int(s[1]*ratio)), Image.ANTIALIAS)
         return image
 
-def make_folder(directory):
-    """
-    Make folder if it doesn't already exist
-    :param directory: The folder destination path
-    """
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+
+
         
-
-main_path =  'C:\\Users\\arnHom\\Documents\\sudoku\\data'
-df_path = 'labels.csv'
-
-def setMainPath():
-    global main_path, df_path
-    path = filedialog.askopenfilenames(title='Open project', filetypes = ( ('csv files', ['*.csv']), ('all files','*.*')) )
-    # now we need to break the basename off of the rest of the directory
-    path, basename = os.path.split(path)
-    df_path = basename
-    main_path = path
-
-def newProject():
-    global main_path, df_path
-    path = filedialog.askdirectory(title='Set folder for new project (the one with your images in it)')
-    main_path = path
-    df_path = 'labels.csv'
-    
-    # Put all image file paths into a list
-    paths = []
-    
-    file_names = [fn for fn in sorted(os.listdir( main_path))
-                  if any(fn.endswith(ext) for ext in file_extensions)]
-    paths = [file_name for file_name in file_names]
-
-    print('created a new data file')
-    df = pd.DataFrame(columns=["im_path", 'tlx','tly','trx','try','blx','bly','brx','bry'])
-    defaultValues = np.ones((len(paths),1))*0.5
-    df.im_path = paths
-    for name in df.columns:
-        if name != 'im_path':
-            df[name] = defaultValues
-
-
-# The main bit of the script only gets exectured if it is directly called
-if __name__ == "__main__":
-
-###### Commenting out the initial input and puting input into preamble
-# TODO seems it would probably be a good idea to allow this stuff to function again.
-#     # Make input arguments
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('-f', '--folder', help='Input folder where the *tif images should be', required=True)
-#     parser.add_argument('-l', '--labels', nargs='+', help='Possible labels in the images', required=True)
-#     args = parser.parse_args()
-
-#     # grab input arguments from args structure
-#     input_folder = args.folder
-#     labels = args.labels
-
-
-    # Start the GUI
-    root = tk.Tk()
-
-
-    testFrame = tk.Frame(root)
-    testFrame.grid()
-
-    openButton = tk.Button(testFrame, text='open project', command=lambda: setMainPath())
-    openButton.grid(row=0,column=0,columnspan=3,sticky='we')
-
-    newButton = tk.Button(testFrame, text='new project', command = lambda: newProject())
-    newButton.grid(row=1, column=0, columnspan=3, sticky='we')
-
-    # once we get the main stuff all setup, we need to boot the imagegui going agin
-
-    root.mainloop()
-    # is there a way to allow files to show? 
+# boot program.
+root = tk.Tk()
+app = ImageGui(root)
+root.mainloop()
 
     
 
-    # app = ImageGui(root, paths)
+    
 
