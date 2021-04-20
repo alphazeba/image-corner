@@ -23,7 +23,7 @@ import os
 import numpy as np
 import argparse # do we need this?
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, simpledialog, messagebox
 import os
 from shutil import copyfile, move
 from PIL import ImageTk, Image
@@ -70,6 +70,7 @@ class ImageGui:
         fileMenu.add_command(label='new project', command=self.newProject)
         fileMenu.add_separator()
         fileMenu.add_command(label='close project', command = self.closeProject)
+        fileMenu.add_command(label='export project', command=self.exportProject)
         
         editMenu.add_command(label='(r)emove image',command=self.remove_image)
         editMenu.add_separator()
@@ -128,6 +129,44 @@ class ImageGui:
 
         newButton = tk.Button(self.frame, text='new project', command = self.newProject)
         newButton.grid(row=0, column=1, sticky='we')
+        
+    def exportProject(self):
+        exportString = simpledialog.askstring(title='export project', prompt='seperated by a dash; enter just a single number if exporting from the beginning; enter nothing to export everything')
+        rangeToExport = range(len(self.df))
+        if exportString != '':
+            # we will need to actually parse the string.
+            try: # in the event it is only a single string entered.
+                rangeToExport = range(int(exportString)-1)
+            except: # otherwise, the user should have entered 2 numbers seperated by a '-'
+                nums = exportString.split('-')
+                print(nums)
+                rangeToExport = range(int(nums[0])-1,int(nums[1])-1) # subtracting 1 because user facing numbers start at 1 while internal are 0 based.
+        
+        print(rangeToExport)
+        destinationPath = filedialog.askdirectory(title='choose a folder to export data too')
+        if path =='':
+            print("didn't export the project")
+            return
+        
+        # copy the files over.
+        for index in rangeToExport:
+            fileName = self.df.iloc[index].im_path # maybe we should consider removing any of the fancy foldering type stuff out of the way? 
+            # if there is the potential for some folder existing, maybe we should check whether there is a folder in the path and then create the folders to make sure it can be copied over.
+            copyfile( os.path.join(self.main_path, fileName ), os.path.join( destinationPath, fileName ) )
+        
+        # now we need to make a new df with the copied over files in it.
+        newDf = df.iloc[rangeToExport]
+        newDf.to_csv(destinationPath) # save the new df over to the location
+        
+        # then maybe we should open up the new project?
+        # or maybe we should tell the user that they are still in the old project so that they know whats up.
+        result = messagebox.showinfo("Export complete","your export has been exported to "+destinationPath+".  The original project is still open, if you would like to edit the export, please open it now")
+        
+        
+        
+        # otherwise, we are ready to begin moving stuff into the new folder.
+        # we can duplicate the current project over there. and then we would need to start movign the photos over ther.edit
+        # we would need to make sure that we are only duplicating the portion of the dataframe that is within the range though.
         
     def openProject(self):
         path = filedialog.askopenfilename(title='Open project', filetypes = ( ('csv files', ['*.csv']), ('all files','*.*')) )
